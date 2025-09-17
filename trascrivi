@@ -1,0 +1,3 @@
+#!/bin/bash
+# Alias italiano per transcribe
+exec "$(dirname "$0")/transcribe" "$@"

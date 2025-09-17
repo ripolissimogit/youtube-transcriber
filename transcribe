@@ -68,13 +68,16 @@ def show_help():
 
 📖 USO:
   transcribe                          # Modalità interattiva
+  trascrivi                           # Modalità interattiva (italiano)
   transcribe URL_YOUTUBE              # Trascrivi video
+  trascrivi https://youtu.be/abc123   # Trascrivi video (italiano)
   transcribe /path/file.mp3           # Trascrivi file audio
   transcribe --help                   # Mostra questo aiuto
   transcribe --setup                  # Configura API key
 
 📝 ESEMPI:
   transcribe https://youtu.be/dQw4w9WgXcQ
+  trascrivi https://youtu.be/dQw4w9WgXcQ
   transcribe /Users/nome/audio.mp3
 
 🔧 CONFIGURAZIONE:
@@ -86,6 +89,7 @@ def show_help():
   - Puoi incollare URL senza virgolette
   - I parametri di tracking vengono rimossi automaticamente
   - Formati supportati: mp3, m4a, wav, webm, ogg, flac
+  - Funziona con entrambi i comandi: transcribe e trascrivi
 """)
 
 def interactive_mode():
@@ -104,7 +108,7 @@ def interactive_mode():
         choice = input("\nScegli (1-5): ").strip()
         
         if choice == "1":
-            url = input("\n📎 Incolla URL YouTube: ").strip()
+            url = input("\n📎 Incolla URL YouTube (senza virgolette): ").strip()
             if url:
                 process_youtube(url)
         elif choice == "2":
@@ -233,6 +237,10 @@ def process_audio_file(file_path):
     except Exception as e:
         print(f"❌ Errore: {e}")
 
+def is_youtube_url(text):
+    """Controlla se il testo è un URL YouTube"""
+    return any(domain in text.lower() for domain in ['youtube.com', 'youtu.be', 'youtube.be'])
+
 def main():
     # Gestione argomenti
     if len(sys.argv) == 1:
@@ -245,7 +253,7 @@ def main():
             show_help()
         elif arg in ['--setup', 'setup']:
             setup_api_key()
-        elif 'youtube.com' in arg or 'youtu.be' in arg:
+        elif is_youtube_url(arg):
             process_youtube(arg)
         elif os.path.exists(arg):
             process_audio_file(arg)
