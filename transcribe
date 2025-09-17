@@ -32,12 +32,12 @@ def transcribe_audio(audio_file, api_key):
 def extract_audio_from_youtube(url):
     with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as tmp:
         cmd = ['yt-dlp', '--extract-audio', '--audio-format', 'mp3', 
-               '--audio-quality', '64K', '--postprocessor-args', 'ffmpeg:-ac 1 -ar 16000',
+               '--audio-quality', '64K', '--no-check-certificate',
                '-o', tmp.name.replace('.mp3', ''), url]
         
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
-            raise Exception(f"Errore download: {result.stderr}")
+            raise Exception(f"Errore download: {result.stderr.strip()}")
         
         return tmp.name
 
