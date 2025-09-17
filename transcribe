@@ -30,15 +30,35 @@ def transcribe_audio(audio_file, api_key):
     return response.json().get('text', '')
 
 def extract_audio_from_youtube(url):
-    with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as tmp:
-        cmd = ['yt-dlp', '-x', '--audio-format', 'mp3', 
-               '-o', tmp.name.replace('.mp3', ''), url]
-        
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode != 0:
-            raise Exception(f"Errore download: {result.stderr.strip()}")
-        
-        return tmp.name
+    import tempfile
+    temp_dir = tempfile.mkdtemp()
+    base_name = os.path.join(temp_dir, "audio")
+    
+    cmd = ['yt-dlp', '-f', '140', '-o', base_name, url]
+    
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise Exception(f"Errore download: {result.stderr.strip()}")
+    
+    # Cerca il file scaricato
+    import glob
+    files = glob.glob(base_name + "*")
+    if not files:
+        raise Exception("File audio non trovato dopo download")
+    
+    m4a_file = files[0]
+    mp3_file = os.path.join(temp_dir, "audio.mp3")
+    
+    # Converti in mp3 per Groq
+    cmd_convert = ['ffmpeg', '-i', m4a_file, '-acodec', 'mp3', '-y', mp3_file]
+    result = subprocess.run(cmd_convert, capture_output=True, text=True)
+    
+    if result.returncode != 0:
+        return m4a_file  # Se conversione fallisce, usa l'originale
+    
+    # Rimuovi file originale
+    os.unlink(m4a_file)
+    return mp3_file
 
 def main():
     if len(sys.argv) != 2:
