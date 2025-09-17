@@ -9,8 +9,9 @@ def get_groq_key():
     key = os.getenv('GROQ_API_KEY')
     if not key:
         print("❌ GROQ_API_KEY non configurata")
-        print("Ottieni la chiave da: https://console.groq.com/keys")
+        print("Ottieni una chiave gratuita da: https://console.groq.com/keys")
         print("Poi esegui: export GROQ_API_KEY='la_tua_chiave'")
+        print("O aggiungi al tuo ~/.zshrc: export GROQ_API_KEY='la_tua_chiave'")
         sys.exit(1)
     return key
 
