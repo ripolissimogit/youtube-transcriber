@@ -40,25 +40,18 @@ def extract_audio_from_youtube(url):
     if result.returncode != 0:
         raise Exception(f"Errore download: {result.stderr.strip()}")
     
-    # Cerca il file scaricato
+    # Cerca il file scaricato e rinomina con estensione corretta
     import glob
     files = glob.glob(base_name + "*")
     if not files:
         raise Exception("File audio non trovato dopo download")
     
-    m4a_file = files[0]
-    mp3_file = os.path.join(temp_dir, "audio.mp3")
+    original_file = files[0]
+    m4a_file = os.path.join(temp_dir, "audio.m4a")
     
-    # Converti in mp3 per Groq
-    cmd_convert = ['ffmpeg', '-i', m4a_file, '-acodec', 'mp3', '-y', mp3_file]
-    result = subprocess.run(cmd_convert, capture_output=True, text=True)
-    
-    if result.returncode != 0:
-        return m4a_file  # Se conversione fallisce, usa l'originale
-    
-    # Rimuovi file originale
-    os.unlink(m4a_file)
-    return mp3_file
+    # Rinomina per avere estensione corretta per Groq
+    os.rename(original_file, m4a_file)
+    return m4a_file
 
 def main():
     if len(sys.argv) != 2:
