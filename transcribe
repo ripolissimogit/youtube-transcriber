@@ -4,33 +4,125 @@ import os
 import tempfile
 import subprocess
 import requests
+import re
+import glob
+
+def clean_youtube_url(url):
+    """Pulisce URL YouTube da parametri di tracking"""
+    # Estrae solo video ID
+    patterns = [
+        r'(?:youtube\.com/watch\?v=|youtu\.be/)([a-zA-Z0-9_-]{11})',
+        r'youtube\.com/embed/([a-zA-Z0-9_-]{11})',
+    ]
+    
+    for pattern in patterns:
+        match = re.search(pattern, url)
+        if match:
+            video_id = match.group(1)
+            return f"https://youtu.be/{video_id}"
+    
+    return url
+
+def setup_api_key():
+    """Configura chiave API interattivamente"""
+    print("\n🔑 Configurazione Groq API")
+    print("1. Vai su: https://console.groq.com/keys")
+    print("2. Crea un account gratuito")
+    print("3. Genera una nuova API key")
+    print()
+    
+    api_key = input("Incolla qui la tua chiave API: ").strip()
+    
+    if not api_key:
+        print("❌ Nessuna chiave inserita")
+        return False
+    
+    # Salva in .zshrc
+    zshrc = os.path.expanduser("~/.zshrc")
+    with open(zshrc, "a") as f:
+        f.write(f"\n# YouTube Transcriber\nexport GROQ_API_KEY=\"{api_key}\"\n")
+    
+    # Imposta per sessione corrente
+    os.environ['GROQ_API_KEY'] = api_key
+    
+    print("✅ Chiave API configurata!")
+    print("💡 Riavvia il terminale per renderla permanente")
+    return True
 
 def get_groq_key():
+    """Ottieni chiave API con setup automatico se mancante"""
     key = os.getenv('GROQ_API_KEY')
     if not key:
-        print("❌ GROQ_API_KEY non configurata")
-        print("Ottieni una chiave gratuita da: https://console.groq.com/keys")
-        print("Poi esegui: export GROQ_API_KEY='la_tua_chiave'")
-        print("O aggiungi al tuo ~/.zshrc: export GROQ_API_KEY='la_tua_chiave'")
-        sys.exit(1)
+        print("❌ Chiave API Groq non trovata")
+        if input("Vuoi configurarla ora? (s/n): ").lower().startswith('s'):
+            return setup_api_key()
+        else:
+            print("💡 Configura manualmente: export GROQ_API_KEY='la_tua_chiave'")
+            return False
     return key
 
-def transcribe_audio(audio_file, api_key):
-    with open(audio_file, 'rb') as f:
-        response = requests.post(
-            'https://api.groq.com/openai/v1/audio/transcriptions',
-            headers={'Authorization': f'Bearer {api_key}'},
-            files={'file': f},
-            data={'model': 'whisper-large-v3', 'language': 'it'}
-        )
+def show_help():
+    """Mostra aiuto"""
+    print("""
+🎥 YouTube Transcriber - Aiuto
+
+📖 USO:
+  transcribe                          # Modalità interattiva
+  transcribe URL_YOUTUBE              # Trascrivi video
+  transcribe /path/file.mp3           # Trascrivi file audio
+  transcribe --help                   # Mostra questo aiuto
+  transcribe --setup                  # Configura API key
+
+📝 ESEMPI:
+  transcribe https://youtu.be/dQw4w9WgXcQ
+  transcribe /Users/nome/audio.mp3
+
+🔧 CONFIGURAZIONE:
+  - Serve una chiave API Groq gratuita
+  - Ottienila da: https://console.groq.com/keys
+  - Limite: 25MB per file audio
+
+💡 SUGGERIMENTI:
+  - Puoi incollare URL senza virgolette
+  - I parametri di tracking vengono rimossi automaticamente
+  - Formati supportati: mp3, m4a, wav, webm, ogg, flac
+""")
+
+def interactive_mode():
+    """Modalità interattiva per utenti non tecnici"""
+    print("🎥 YouTube Transcriber")
+    print("=" * 30)
     
-    if response.status_code != 200:
-        raise Exception(f"Errore API: {response.status_code}")
-    
-    return response.json().get('text', '')
+    while True:
+        print("\n📋 Cosa vuoi fare?")
+        print("1. Trascrivere video YouTube")
+        print("2. Trascrivere file audio locale")
+        print("3. Configurare API key")
+        print("4. Aiuto")
+        print("5. Esci")
+        
+        choice = input("\nScegli (1-5): ").strip()
+        
+        if choice == "1":
+            url = input("\n📎 Incolla URL YouTube: ").strip()
+            if url:
+                process_youtube(url)
+        elif choice == "2":
+            file_path = input("\n📁 Percorso file audio: ").strip()
+            if file_path:
+                process_audio_file(file_path)
+        elif choice == "3":
+            setup_api_key()
+        elif choice == "4":
+            show_help()
+        elif choice == "5":
+            print("👋 Arrivederci!")
+            break
+        else:
+            print("❌ Scelta non valida")
 
 def extract_audio_from_youtube(url):
-    import tempfile
+    """Estrae audio da YouTube"""
     temp_dir = tempfile.mkdtemp()
     base_name = os.path.join(temp_dir, "audio")
     
@@ -40,60 +132,134 @@ def extract_audio_from_youtube(url):
     if result.returncode != 0:
         raise Exception(f"Errore download: {result.stderr.strip()}")
     
-    # Cerca il file scaricato e rinomina con estensione corretta
-    import glob
+    # Rinomina con estensione corretta
     files = glob.glob(base_name + "*")
     if not files:
-        raise Exception("File audio non trovato dopo download")
+        raise Exception("File audio non trovato")
     
     original_file = files[0]
     m4a_file = os.path.join(temp_dir, "audio.m4a")
-    
-    # Rinomina per avere estensione corretta per Groq
     os.rename(original_file, m4a_file)
     return m4a_file
 
-def main():
-    if len(sys.argv) != 2:
-        print("🎥 YouTube Transcriber")
-        print("Uso: transcribe <url_youtube_o_file_audio>")
-        sys.exit(1)
+def transcribe_audio(audio_file, api_key):
+    """Trascrivi con Groq"""
+    with open(audio_file, 'rb') as f:
+        response = requests.post(
+            'https://api.groq.com/openai/v1/audio/transcriptions',
+            headers={'Authorization': f'Bearer {api_key}'},
+            files={'file': f},
+            data={'model': 'whisper-large-v3', 'language': 'it'}
+        )
     
-    input_arg = sys.argv[1]
+    if response.status_code != 200:
+        raise Exception(f"Errore API Groq: {response.status_code}")
+    
+    return response.json().get('text', '')
+
+def process_youtube(url):
+    """Processa video YouTube"""
     api_key = get_groq_key()
+    if not api_key:
+        return
     
     try:
-        if 'youtube.com' in input_arg or 'youtu.be' in input_arg:
-            print("📥 Scaricando audio...")
-            audio_file = extract_audio_from_youtube(input_arg)
-            cleanup_needed = True
-        else:
-            audio_file = input_arg
-            cleanup_needed = False
-            if not os.path.exists(audio_file):
-                print(f"❌ File non trovato: {audio_file}")
-                sys.exit(1)
+        # Pulisci URL
+        clean_url = clean_youtube_url(url)
+        if clean_url != url:
+            print(f"🧹 URL pulito: {clean_url}")
+        
+        print("📥 Scaricando audio...")
+        audio_file = extract_audio_from_youtube(clean_url)
         
         size_mb = os.path.getsize(audio_file) / (1024 * 1024)
         if size_mb > 25:
             print(f"⚠️ File troppo grande: {size_mb:.1f}MB (limite: 25MB)")
-            if cleanup_needed:
-                os.unlink(audio_file)
-            sys.exit(1)
+            return
         
         print(f"🎤 Trascrivendo... ({size_mb:.1f}MB)")
         transcript = transcribe_audio(audio_file, api_key)
         
-        if cleanup_needed:
-            os.unlink(audio_file)
+        # Cleanup
+        os.unlink(audio_file)
         
         print("\n📝 TRASCRIZIONE:")
-        print("-" * 50)
+        print("=" * 50)
         print(transcript)
+        
+        # Opzioni post-trascrizione
+        print("\n💾 Vuoi salvare la trascrizione?")
+        if input("(s/n): ").lower().startswith('s'):
+            filename = f"trascrizione_{clean_url.split('/')[-1]}.txt"
+            with open(filename, 'w', encoding='utf-8') as f:
+                f.write(f"URL: {clean_url}\n\n{transcript}")
+            print(f"✅ Salvato in: {filename}")
         
     except Exception as e:
         print(f"❌ Errore: {e}")
-        sys.exit(1)
+
+def process_audio_file(file_path):
+    """Processa file audio locale"""
+    api_key = get_groq_key()
+    if not api_key:
+        return
+    
+    try:
+        if not os.path.exists(file_path):
+            print(f"❌ File non trovato: {file_path}")
+            return
+        
+        size_mb = os.path.getsize(file_path) / (1024 * 1024)
+        if size_mb > 25:
+            print(f"⚠️ File troppo grande: {size_mb:.1f}MB (limite: 25MB)")
+            return
+        
+        print(f"🎤 Trascrivendo... ({size_mb:.1f}MB)")
+        transcript = transcribe_audio(file_path, api_key)
+        
+        print("\n📝 TRASCRIZIONE:")
+        print("=" * 50)
+        print(transcript)
+        
+        # Salvataggio
+        print("\n💾 Vuoi salvare la trascrizione?")
+        if input("(s/n): ").lower().startswith('s'):
+            base_name = os.path.splitext(os.path.basename(file_path))[0]
+            filename = f"trascrizione_{base_name}.txt"
+            with open(filename, 'w', encoding='utf-8') as f:
+                f.write(f"File: {file_path}\n\n{transcript}")
+            print(f"✅ Salvato in: {filename}")
+        
+    except Exception as e:
+        print(f"❌ Errore: {e}")
+
+def main():
+    # Gestione argomenti
+    if len(sys.argv) == 1:
+        # Modalità interattiva
+        interactive_mode()
+    elif len(sys.argv) == 2:
+        arg = sys.argv[1]
+        
+        if arg in ['--help', '-h', 'help']:
+            show_help()
+        elif arg in ['--setup', 'setup']:
+            setup_api_key()
+        elif 'youtube.com' in arg or 'youtu.be' in arg:
+            process_youtube(arg)
+        elif os.path.exists(arg):
+            process_audio_file(arg)
+        else:
+            print(f"❌ File non trovato o URL non valido: {arg}")
+            print("💡 Usa 'transcribe --help' per aiuto")
+    else:
+        print("❌ Troppi argomenti")
+        print("💡 Usa 'transcribe --help' per aiuto")
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\n👋 Interrotto dall'utente")
+    except Exception as e:
+        print(f"❌ Errore imprevisto: {e}")
