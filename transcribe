@@ -9,7 +9,14 @@ import requests
 import json
 from datetime import datetime
 
-VERSION = "3.1.0"
+# Assicura che Homebrew sia nel PATH
+homebrew_paths = ["/opt/homebrew/bin", "/usr/local/bin"]
+current_path = os.environ.get("PATH", "")
+for path in homebrew_paths:
+    if path not in current_path:
+        os.environ["PATH"] = f"{path}:{current_path}"
+
+VERSION = "3.2.2"
 
 def check_for_updates():
     """Controlla se è disponibile un aggiornamento"""
