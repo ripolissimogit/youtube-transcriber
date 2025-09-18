@@ -9,6 +9,21 @@ import requests
 import json
 from datetime import datetime
 
+VERSION = "3.1.0"
+
+def check_for_updates():
+    """Controlla se è disponibile un aggiornamento"""
+    try:
+        response = requests.get("https://api.github.com/repos/ripolissimogit/youtube-transcriber/releases/latest", timeout=3)
+        if response.status_code == 200:
+            latest = response.json()["tag_name"].replace("v", "")
+            if latest != VERSION:
+                print(f"🆕 Aggiornamento disponibile: v{latest} (attuale: v{VERSION})")
+                print("💡 Per aggiornare: curl -sSL https://raw.githubusercontent.com/ripolissimogit/youtube-transcriber/main/install-sbobina.sh | bash")
+                print()
+    except:
+        pass  # Ignora errori di rete
+
 def get_video_metadata(url):
     """Ottiene metadati del video YouTube"""
     try:
@@ -424,6 +439,15 @@ def is_youtube_url(text):
     return any(domain in text.lower() for domain in ['youtube.com', 'youtu.be', 'youtube.be'])
 
 def main():
+    # Controlla aggiornamenti (solo una volta al giorno)
+    update_file = os.path.expanduser("~/.sbobina_last_check")
+    today = datetime.now().strftime("%Y-%m-%d")
+    
+    if not os.path.exists(update_file) or open(update_file).read().strip() != today:
+        check_for_updates()
+        with open(update_file, "w") as f:
+            f.write(today)
+    
     # Gestione argomenti
     if len(sys.argv) == 1:
         # Modalità interattiva
