@@ -22,28 +22,7 @@ for path in ytdlp_paths:
     if path not in current_path:
         os.environ["PATH"] = f"{path}:{os.environ['PATH']}"
 
-VERSION = "3.3.0"
-
-def check_for_updates():
-    """Controlla se è disponibile un aggiornamento"""
-    try:
-        response = requests.get("https://api.github.com/repos/ripolissimogit/youtube-transcriber/releases/latest", timeout=5)
-        if response.status_code == 200:
-            latest = response.json()["tag_name"].replace("v", "")
-            if latest != VERSION:
-                print(f"🆕 Aggiornamento disponibile: v{latest} (attuale: v{VERSION})")
-                print("💡 Per aggiornare: curl -sSL https://raw.githubusercontent.com/ripolissimogit/youtube-transcriber/main/install-sbobina.sh | bash")
-                print()
-                return True
-            else:
-                print(f"✅ Hai già l'ultima versione: v{VERSION}")
-                return False
-        else:
-            print("⚠️ Impossibile verificare aggiornamenti (GitHub API non disponibile)")
-            return False
-    except Exception as e:
-        print("⚠️ Controllo aggiornamenti non disponibile (connessione limitata)")
-        return False
+VERSION = "3.4.0"
 
 def get_video_metadata(url):
     """Ottiene metadati del video YouTube"""
@@ -226,8 +205,9 @@ def show_help():
   transcribe /Users/nome/audio.mp3
 
 🔧 CONFIGURAZIONE:
-  - Serve una chiave API Groq gratuita
-  - Ottienila da: https://console.groq.com/keys
+  - Servono chiavi API Groq e OpenAI (gratuite)
+  - Groq: https://console.groq.com/keys
+  - OpenAI: https://platform.openai.com/api-keys
   - Limite: 25MB per file audio
 
 💡 SUGGERIMENTI:
@@ -246,12 +226,11 @@ def interactive_mode():
         print("\n📋 Cosa vuoi fare?")
         print("1. Trascrivere video YouTube")
         print("2. Trascrivere file audio locale")
-        print("3. Configurare API key")
-        print("4. Controlla aggiornamenti")
-        print("5. Aiuto")
-        print("6. Esci")
+        print("3. Configurare API keys")
+        print("4. Aiuto")
+        print("5. Esci")
         
-        choice = input("\nScegli (1-6): ").strip()
+        choice = input("\nScegli (1-5): ").strip()
         
         if choice == "1":
             url = input("\n📎 Incolla URL YouTube (senza virgolette): ").strip()
@@ -264,11 +243,8 @@ def interactive_mode():
         elif choice == "3":
             setup_api_keys()
         elif choice == "4":
-            print("\n🔍 Controllo aggiornamenti...")
-            check_for_updates()
-        elif choice == "5":
             show_help()
-        elif choice == "6":
+        elif choice == "5":
             print("👋 Arrivederci!")
             break
         else:
