@@ -14,15 +14,23 @@ VERSION = "3.1.0"
 def check_for_updates():
     """Controlla se è disponibile un aggiornamento"""
     try:
-        response = requests.get("https://api.github.com/repos/ripolissimogit/youtube-transcriber/releases/latest", timeout=3)
+        response = requests.get("https://api.github.com/repos/ripolissimogit/youtube-transcriber/releases/latest", timeout=5)
         if response.status_code == 200:
             latest = response.json()["tag_name"].replace("v", "")
             if latest != VERSION:
                 print(f"🆕 Aggiornamento disponibile: v{latest} (attuale: v{VERSION})")
                 print("💡 Per aggiornare: curl -sSL https://raw.githubusercontent.com/ripolissimogit/youtube-transcriber/main/install-sbobina.sh | bash")
                 print()
+                return True
+            else:
+                print(f"✅ Hai già l'ultima versione: v{VERSION}")
+                return False
+        else:
+            print("❌ Impossibile controllare aggiornamenti")
+            return False
     except:
-        pass  # Ignora errori di rete
+        print("❌ Errore di connessione durante il controllo aggiornamenti")
+        return False
 
 def get_video_metadata(url):
     """Ottiene metadati del video YouTube"""
@@ -205,10 +213,11 @@ def interactive_mode():
         print("1. Trascrivere video YouTube")
         print("2. Trascrivere file audio locale")
         print("3. Configurare API key")
-        print("4. Aiuto")
-        print("5. Esci")
+        print("4. Controlla aggiornamenti")
+        print("5. Aiuto")
+        print("6. Esci")
         
-        choice = input("\nScegli (1-5): ").strip()
+        choice = input("\nScegli (1-6): ").strip()
         
         if choice == "1":
             url = input("\n📎 Incolla URL YouTube (senza virgolette): ").strip()
@@ -219,10 +228,13 @@ def interactive_mode():
             if file_path:
                 process_audio_file(file_path)
         elif choice == "3":
-            setup_api_key()
+            setup_api_keys()
         elif choice == "4":
-            show_help()
+            print("\n🔍 Controllo aggiornamenti...")
+            check_for_updates()
         elif choice == "5":
+            show_help()
+        elif choice == "6":
             print("👋 Arrivederci!")
             break
         else:
