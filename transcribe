@@ -127,20 +127,23 @@ def interactive_mode():
 
 def extract_audio_from_youtube(url):
     """Estrae audio da YouTube"""
-    with tempfile.NamedTemporaryFile(suffix='.webm', delete=False) as tmp:
-        cmd = ['yt-dlp', '-f', 'bestaudio', 
-               '-o', tmp.name.replace('.webm', ''), url]
-        
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode != 0:
-            raise Exception(f"Errore download: {result.stderr.strip()}")
-        
-        # Trova il file scaricato
-        import glob
-        files = glob.glob(tmp.name.replace('.webm', '') + '*')
-        if files:
-            return files[0]
-        return tmp.name
+    import tempfile
+    temp_dir = tempfile.mkdtemp()
+    base_name = os.path.join(temp_dir, "audio")
+    
+    cmd = ['yt-dlp', '--extract-audio', '--audio-format', 'mp3', 
+           '--audio-quality', '64K', '-o', base_name, url]
+    
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise Exception(f"Errore download: {result.stderr.strip()}")
+    
+    # Trova il file scaricato
+    files = glob.glob(base_name + '*.mp3')
+    if not files:
+        raise Exception("File audio non trovato")
+    
+    return files[0]
 
 def transcribe_audio(audio_file, api_key):
     """Trascrivi con Groq usando requests"""
