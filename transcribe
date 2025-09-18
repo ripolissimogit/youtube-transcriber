@@ -158,18 +158,39 @@ def setup_api_keys():
         print("❌ Entrambe le chiavi sono obbligatorie")
         return False, False
     
-    # Salva in .zshrc
-    zshrc = os.path.expanduser("~/.zshrc")
-    with open(zshrc, "a") as f:
-        f.write(f"\n# YouTube Transcriber\nexport GROQ_API_KEY=\"{groq_key}\"\n")
-        f.write(f"export OPENAI_API_KEY=\"{openai_key}\"\n")
+    # Salva in entrambi i file di configurazione
+    shell_files = ["~/.zshrc", "~/.bashrc"]
+    for shell_file in shell_files:
+        file_path = os.path.expanduser(shell_file)
+        if os.path.exists(file_path):
+            # Rimuovi vecchie configurazioni se presenti
+            with open(file_path, "r") as f:
+                lines = f.readlines()
+            
+            # Filtra le vecchie chiavi
+            new_lines = []
+            skip_next = False
+            for line in lines:
+                if "# YouTube Transcriber" in line:
+                    skip_next = True
+                    continue
+                if skip_next and ("GROQ_API_KEY" in line or "OPENAI_API_KEY" in line):
+                    continue
+                skip_next = False
+                new_lines.append(line)
+            
+            # Aggiungi nuove chiavi
+            with open(file_path, "w") as f:
+                f.writelines(new_lines)
+                f.write(f"\n# YouTube Transcriber\nexport GROQ_API_KEY=\"{groq_key}\"\n")
+                f.write(f"export OPENAI_API_KEY=\"{openai_key}\"\n")
     
     # Imposta per sessione corrente
     os.environ['GROQ_API_KEY'] = groq_key
     os.environ['OPENAI_API_KEY'] = openai_key
     
-    print("✅ Entrambe le chiavi API configurate!")
-    print("💡 Riavvia il terminale per renderle permanenti")
+    print("✅ Chiavi API configurate e attive!")
+    print("💡 Le chiavi sono già disponibili in questa sessione")
     return groq_key, openai_key
 
 def show_help():
