@@ -16,6 +16,12 @@ for path in homebrew_paths:
     if path not in current_path:
         os.environ["PATH"] = f"{path}:{current_path}"
 
+# Aggiungi yt-dlp PATH specifico per Homebrew
+ytdlp_paths = glob.glob("/opt/homebrew/Cellar/yt-dlp/*/bin")
+for path in ytdlp_paths:
+    if path not in current_path:
+        os.environ["PATH"] = f"{path}:{os.environ['PATH']}"
+
 VERSION = "3.3.0"
 
 def check_for_updates():
@@ -489,7 +495,7 @@ def main():
         if arg in ['--help', '-h', 'help']:
             show_help()
         elif arg in ['--setup', 'setup']:
-            setup_api_key()
+            setup_api_keys()
         elif is_youtube_url(arg):
             process_youtube(arg)
         elif os.path.exists(arg):
