@@ -17,8 +17,8 @@ echo "  🗑️ Rimuovendo file in conflitto..."
 sudo rm -f /opt/homebrew/bin/transcribe* /opt/homebrew/bin/sbobina* /opt/homebrew/bin/trascrivi* /opt/homebrew/bin/yt-* 2>/dev/null || true
 sudo rm -f /usr/local/bin/transcribe-wrapper 2>/dev/null || true
 
-# Rimuovi vecchie directory di sviluppo
-rm -rf ~/youtube-transcriber-dev ~/youtube-transcriber-brew ~/homebrew-tap 2>/dev/null || true
+# Rimuovi vecchie directory di sviluppo e temp
+rm -rf ~/youtube-transcriber-dev ~/youtube-transcriber-brew ~/homebrew-tap ~/temp-repo* 2>/dev/null || true
 
 echo "✅ Pulizia completata"
 
