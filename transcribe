@@ -6,6 +6,92 @@ import subprocess
 import re
 import glob
 import requests
+import json
+from datetime import datetime
+
+def get_video_metadata(url):
+    """Ottiene metadati del video YouTube"""
+    try:
+        cmd = ['yt-dlp', '--dump-json', '--no-download', url]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode == 0:
+            data = json.loads(result.stdout)
+            return {
+                'title': data.get('title', 'N/A'),
+                'channel': data.get('uploader', 'N/A'),
+                'upload_date': data.get('upload_date', 'N/A'),
+                'duration': data.get('duration', 0),
+                'view_count': data.get('view_count', 0),
+                'description': data.get('description', '')[:200] + '...' if data.get('description') else 'N/A'
+            }
+    except:
+        pass
+    return {
+        'title': 'N/A', 'channel': 'N/A', 'upload_date': 'N/A', 
+        'duration': 0, 'view_count': 0, 'description': 'N/A'
+    }
+
+def improve_transcript_with_openai(transcript, metadata, api_key):
+    """Migliora la trascrizione usando OpenAI"""
+    if not api_key:
+        return transcript, "Elaborazione OpenAI non disponibile (chiave API mancante)"
+    
+    prompt = f"""Migliora questa trascrizione di un video YouTube senza modificarne il contenuto sostanziale:
+
+COMPITI:
+1. Correggi errori di battitura e grammatica
+2. Dividi in paragrafi logici
+3. Mantieni il tono e il contenuto originale
+4. NON aggiungere informazioni non presenti nel testo
+
+TRASCRIZIONE ORIGINALE:
+{transcript}
+
+Rispondi SOLO con il testo migliorato, senza commenti aggiuntivi."""
+
+    try:
+        response = requests.post(
+            'https://api.openai.com/v1/chat/completions',
+            headers={
+                'Authorization': f'Bearer {api_key}',
+                'Content-Type': 'application/json'
+            },
+            json={
+                'model': 'gpt-4o-mini',
+                'messages': [{'role': 'user', 'content': prompt}],
+                'max_tokens': 4000,
+                'temperature': 0.3
+            }
+        )
+        
+        if response.status_code == 200:
+            improved = response.json()['choices'][0]['message']['content']
+            
+            # Genera sintesi
+            summary_prompt = f"Scrivi una sintesi di massimo 2-3 frasi del seguente testo:\n\n{improved}"
+            summary_response = requests.post(
+                'https://api.openai.com/v1/chat/completions',
+                headers={
+                    'Authorization': f'Bearer {api_key}',
+                    'Content-Type': 'application/json'
+                },
+                json={
+                    'model': 'gpt-4o-mini',
+                    'messages': [{'role': 'user', 'content': summary_prompt}],
+                    'max_tokens': 200,
+                    'temperature': 0.3
+                }
+            )
+            
+            summary = "Sintesi non disponibile"
+            if summary_response.status_code == 200:
+                summary = summary_response.json()['choices'][0]['message']['content']
+            
+            return improved, summary
+        else:
+            return transcript, "Errore nell'elaborazione OpenAI"
+    except Exception as e:
+        return transcript, f"Errore OpenAI: {str(e)}"
 
 def clean_youtube_url(url):
     """Pulisce URL YouTube da parametri di tracking"""
@@ -24,29 +110,35 @@ def clean_youtube_url(url):
     return url
 
 def setup_api_key():
-    """Configura chiave API interattivamente"""
-    print("\n🔑 Configurazione Groq API")
-    print("1. Vai su: https://console.groq.com/keys")
-    print("2. Crea un account gratuito")
-    print("3. Genera una nuova API key")
+    """Configura chiavi API interattivamente"""
+    print("\n🔑 Configurazione API Keys")
+    print("1. Groq API (OBBLIGATORIA): https://console.groq.com/keys")
+    print("2. OpenAI API (OPZIONALE): https://platform.openai.com/api-keys")
     print()
     
-    api_key = input("Incolla qui la tua chiave API: ").strip()
+    groq_key = input("Incolla qui la tua chiave Groq API: ").strip()
+    openai_key = input("Incolla qui la tua chiave OpenAI (Enter per saltare): ").strip()
     
-    if not api_key:
-        print("❌ Nessuna chiave inserita")
+    if not groq_key:
+        print("❌ Chiave Groq obbligatoria non inserita")
         return False
     
     # Salva in .zshrc
     zshrc = os.path.expanduser("~/.zshrc")
     with open(zshrc, "a") as f:
-        f.write(f"\n# YouTube Transcriber\nexport GROQ_API_KEY=\"{api_key}\"\n")
+        f.write(f"\n# YouTube Transcriber\nexport GROQ_API_KEY=\"{groq_key}\"\n")
+        if openai_key:
+            f.write(f"export OPENAI_API_KEY=\"{openai_key}\"\n")
     
     # Imposta per sessione corrente
-    os.environ['GROQ_API_KEY'] = api_key
+    os.environ['GROQ_API_KEY'] = groq_key
+    if openai_key:
+        os.environ['OPENAI_API_KEY'] = openai_key
     
-    print("✅ Chiave API configurata!")
-    print("💡 Riavvia il terminale per renderla permanente")
+    print("✅ Chiavi API configurate!")
+    if openai_key:
+        print("🤖 OpenAI abilitato per miglioramento trascrizioni")
+    print("💡 Riavvia il terminale per renderle permanenti")
     return True
 
 def get_groq_key():
@@ -174,6 +266,10 @@ def process_youtube(url):
         if clean_url != url:
             print(f"🧹 URL pulito: {clean_url}")
         
+        # Ottieni metadati video
+        print("📊 Recuperando metadati video...")
+        metadata = get_video_metadata(clean_url)
+        
         print("📥 Scaricando audio...")
         audio_file = extract_audio_from_youtube(clean_url)
         
@@ -188,16 +284,59 @@ def process_youtube(url):
         # Cleanup
         os.unlink(audio_file)
         
+        # Elaborazione con OpenAI se disponibile
+        openai_key = os.getenv('OPENAI_API_KEY')
+        if openai_key:
+            print("🤖 Migliorando trascrizione con OpenAI...")
+            improved_transcript, summary = improve_transcript_with_openai(transcript, metadata, openai_key)
+        else:
+            improved_transcript = transcript
+            summary = "Elaborazione OpenAI non disponibile (chiave API mancante)"
+        
         print("\n📝 TRASCRIZIONE:")
         print("=" * 50)
-        print(transcript)
+        print(improved_transcript)
         
         # Opzioni post-trascrizione
-        print("\n💾 Vuoi salvare la trascrizione?")
+        print("\n💾 Vuoi salvare la trascrizione completa?")
         if input("(s/n): ").lower().startswith('s'):
             filename = f"trascrizione_{clean_url.split('/')[-1]}.txt"
+            
+            # Formatta data
+            upload_date = metadata['upload_date']
+            if upload_date != 'N/A' and len(upload_date) == 8:
+                formatted_date = f"{upload_date[:4]}-{upload_date[4:6]}-{upload_date[6:8]}"
+            else:
+                formatted_date = upload_date
+            
+            # Crea contenuto file completo
+            file_content = f"""# TRASCRIZIONE VIDEO YOUTUBE
+# Generata il: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+## INFORMAZIONI VIDEO
+Titolo: {metadata['title']}
+Canale: {metadata['channel']}
+Data pubblicazione: {formatted_date}
+Durata: {metadata['duration']} secondi
+Visualizzazioni: {metadata['view_count']:,} (al momento della trascrizione)
+Link: {clean_url}
+
+## SINTESI
+{summary}
+
+## DESCRIZIONE
+{metadata['description']}
+
+## TRASCRIZIONE COMPLETA
+{improved_transcript}
+
+---
+Trascritto con YouTube Transcriber
+Groq Whisper + {"OpenAI GPT-4o-mini" if openai_key else "Elaborazione base"}
+"""
+            
             with open(filename, 'w', encoding='utf-8') as f:
-                f.write(f"URL: {clean_url}\n\n{transcript}")
+                f.write(file_content)
             print(f"✅ Salvato in: {filename}")
         
     except Exception as e:
