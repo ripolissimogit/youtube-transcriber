@@ -16,7 +16,7 @@ for path in homebrew_paths:
     if path not in current_path:
         os.environ["PATH"] = f"{path}:{current_path}"
 
-VERSION = "3.2.2"
+VERSION = "3.3.0"
 
 def check_for_updates():
     """Controlla se è disponibile un aggiornamento"""
@@ -33,10 +33,10 @@ def check_for_updates():
                 print(f"✅ Hai già l'ultima versione: v{VERSION}")
                 return False
         else:
-            print("❌ Impossibile controllare aggiornamenti")
+            print("⚠️ Impossibile verificare aggiornamenti (GitHub API non disponibile)")
             return False
-    except:
-        print("❌ Errore di connessione durante il controllo aggiornamenti")
+    except Exception as e:
+        print("⚠️ Controllo aggiornamenti non disponibile (connessione limitata)")
         return False
 
 def get_video_metadata(url):
@@ -479,15 +479,6 @@ def is_youtube_url(text):
     return any(domain in text.lower() for domain in ['youtube.com', 'youtu.be', 'youtube.be'])
 
 def main():
-    # Controlla aggiornamenti (solo una volta al giorno)
-    update_file = os.path.expanduser("~/.sbobina_last_check")
-    today = datetime.now().strftime("%Y-%m-%d")
-    
-    if not os.path.exists(update_file) or open(update_file).read().strip() != today:
-        check_for_updates()
-        with open(update_file, "w") as f:
-            f.write(today)
-    
     # Gestione argomenti
     if len(sys.argv) == 1:
         # Modalità interattiva

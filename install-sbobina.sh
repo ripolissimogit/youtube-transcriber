@@ -28,7 +28,7 @@ brew install yt-dlp ffmpeg python3
 
 # Installa moduli Python
 echo "🐍 Installando moduli Python..."
-python3 -m pip install --break-system-packages requests openai
+python3 -m pip install --break-system-packages --upgrade requests openai
 
 # Scarica script
 echo "⬇️ Scaricando script principale..."
